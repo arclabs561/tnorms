@@ -1,0 +1,19 @@
+[package]
+name = "tnorms"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "T-norm and t-conorm families"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/arclabs561/tnorms"
+homepage = "https://github.com/arclabs561/tnorms"
+documentation = "https://docs.rs/tnorms"
+readme = "README.md"
+keywords = ["fuzzy-logic", "tnorm", "tconorm", "logic"]
+categories = ["algorithms", "science", "mathematics"]
+include = ["/src/**/*.rs", "/Cargo.toml", "/LICENSE-*", "/README.md"]
+
+[dependencies]
+
+[package.metadata.docs.rs]
+all-features = true
