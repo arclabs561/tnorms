@@ -2,7 +2,6 @@
 
 [![crates.io](https://img.shields.io/crates/v/tnorms.svg)](https://crates.io/crates/tnorms)
 [![Documentation](https://docs.rs/tnorms/badge.svg)](https://docs.rs/tnorms)
-[![CI](https://github.com/arclabs561/tnorms/actions/workflows/ci.yml/badge.svg)](https://github.com/arclabs561/tnorms/actions/workflows/ci.yml)
 
 T-norm and t-conorm families.
 
@@ -10,8 +9,6 @@ T-norm and t-conorm families.
 multi-way conjunction and disjunction over values in `[0, 1]`.
 
 Dual-licensed under MIT or Apache-2.0.
-
-[crates.io](https://crates.io/crates/tnorms) | [docs.rs](https://docs.rs/tnorms)
 
 ```toml
 [dependencies]
