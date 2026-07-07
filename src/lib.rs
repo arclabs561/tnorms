@@ -22,6 +22,10 @@
 //! assert_eq!(tnorms::LogicFamily::Godel.residuum(0.7, 0.4), 0.4);
 //! ```
 //!
+//! The generic [`TConormFamily`] catalog is an aggregation catalog. Residual
+//! implication is exposed only through [`LogicFamily`], where the t-norm and
+//! residuum form the adjoint pair used by standard t-norm fuzzy logics.
+//!
 //! ## Catalog
 //!
 //! | Family | Formula S(a,b) | Parameter | Behavior |
@@ -376,6 +380,29 @@ mod tests {
 
         assert!((LogicFamily::Lukasiewicz.residuum(0.7, 0.4) - 0.7).abs() < 1e-12);
         assert!((LogicFamily::Lukasiewicz.neg(0.4) - 0.6).abs() < 1e-12);
+    }
+
+    #[test]
+    fn logic_family_residuation_law_holds_on_grid() {
+        let grid = [0.0, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0];
+        for logic in [
+            LogicFamily::Godel,
+            LogicFamily::Product,
+            LogicFamily::Lukasiewicz,
+        ] {
+            for &a in &grid {
+                for &b in &grid {
+                    for &c in &grid {
+                        let left = logic.tnorm(a, c) <= b + 1e-12;
+                        let right = c <= logic.residuum(a, b) + 1e-12;
+                        assert_eq!(
+                            left, right,
+                            "{logic:?}: {a} * {c} <= {b} iff {c} <= ({a} -> {b})"
+                        );
+                    }
+                }
+            }
+        }
     }
 
     #[test]
