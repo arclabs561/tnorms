@@ -12,12 +12,14 @@
 //! ## Named families
 //!
 //! The constants [`GODEL`], [`PRODUCT`], and [`LUKASIEWICZ`] name the three
-//! common fuzzy-logic families:
+//! common fuzzy-logic families. [`LogicFamily`] adds the corresponding
+//! residuum for implication:
 //!
 //! ```
 //! assert_eq!(tnorms::tnorm(tnorms::GODEL, 0.4, 0.7), 0.4);
 //! assert!((tnorms::tnorm(tnorms::PRODUCT, 0.4, 0.7) - 0.28).abs() < 1e-12);
 //! assert!((tnorms::tnorm(tnorms::LUKASIEWICZ, 0.4, 0.7) - 0.1).abs() < 1e-12);
+//! assert_eq!(tnorms::LogicFamily::Godel.residuum(0.7, 0.4), 0.4);
 //! ```
 //!
 //! ## Catalog
@@ -137,6 +139,86 @@ pub const PRODUCT: Family = Family::Probabilistic;
 
 /// Lukasiewicz family: `max(0, a + b - 1)` t-norm and `min(1, a + b)` t-conorm.
 pub const LUKASIEWICZ: Family = Family::Bounded;
+
+/// Standard t-norm fuzzy logic families with residual implication.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogicFamily {
+    /// Godel logic: minimum t-norm.
+    Godel,
+    /// Product logic: product t-norm.
+    Product,
+    /// Lukasiewicz logic: bounded-sum t-norm.
+    Lukasiewicz,
+}
+
+impl LogicFamily {
+    /// The t-conorm catalog family corresponding to this logic.
+    pub const fn family(self) -> Family {
+        match self {
+            Self::Godel => GODEL,
+            Self::Product => PRODUCT,
+            Self::Lukasiewicz => LUKASIEWICZ,
+        }
+    }
+
+    /// Evaluate the t-norm conjunction.
+    pub fn tnorm(self, a: f64, b: f64) -> f64 {
+        tnorm(self.family(), a, b)
+    }
+
+    /// Evaluate the dual t-conorm disjunction.
+    pub fn tconorm(self, a: f64, b: f64) -> f64 {
+        tconorm(self.family(), a, b)
+    }
+
+    /// Evaluate the residual implication `a -> b`.
+    pub fn residuum(self, a: f64, b: f64) -> f64 {
+        let a = a.clamp(0.0, 1.0);
+        let b = b.clamp(0.0, 1.0);
+        match self {
+            Self::Godel => {
+                if a <= b {
+                    1.0
+                } else {
+                    b
+                }
+            }
+            Self::Product => {
+                if a <= b {
+                    1.0
+                } else {
+                    b / a
+                }
+            }
+            Self::Lukasiewicz => (1.0 - a + b).min(1.0),
+        }
+    }
+
+    /// Evaluate the residual negation `a -> 0`.
+    pub fn neg(self, a: f64) -> f64 {
+        self.residuum(a, 0.0)
+    }
+
+    /// Evaluate the t-norm conjunction using `f32`.
+    pub fn tnorm_f32(self, a: f32, b: f32) -> f32 {
+        self.tnorm(f64::from(a), f64::from(b)) as f32
+    }
+
+    /// Evaluate the dual t-conorm disjunction using `f32`.
+    pub fn tconorm_f32(self, a: f32, b: f32) -> f32 {
+        self.tconorm(f64::from(a), f64::from(b)) as f32
+    }
+
+    /// Evaluate the residual implication using `f32`.
+    pub fn residuum_f32(self, a: f32, b: f32) -> f32 {
+        self.residuum(f64::from(a), f64::from(b)) as f32
+    }
+
+    /// Evaluate the residual negation using `f32`.
+    pub fn neg_f32(self, a: f32) -> f32 {
+        self.neg(f64::from(a)) as f32
+    }
+}
 
 /// The dual t-norm T(a,b) = 1 - S(1-a, 1-b) for a given t-conorm family.
 ///
@@ -282,6 +364,43 @@ mod tests {
 
         assert!((tnorm(LUKASIEWICZ, 0.4, 0.7) - 0.1).abs() < 1e-12);
         assert!((tconorm(LUKASIEWICZ, 0.4, 0.7) - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn logic_family_residua_match_common_formulas() {
+        assert!((LogicFamily::Godel.residuum(0.4, 0.7) - 1.0).abs() < 1e-12);
+        assert!((LogicFamily::Godel.residuum(0.7, 0.4) - 0.4).abs() < 1e-12);
+
+        assert!((LogicFamily::Product.residuum(0.4, 0.7) - 1.0).abs() < 1e-12);
+        assert!((LogicFamily::Product.residuum(0.7, 0.28) - 0.4).abs() < 1e-12);
+
+        assert!((LogicFamily::Lukasiewicz.residuum(0.7, 0.4) - 0.7).abs() < 1e-12);
+        assert!((LogicFamily::Lukasiewicz.neg(0.4) - 0.6).abs() < 1e-12);
+    }
+
+    #[test]
+    fn logic_family_f32_helpers_match_f64() {
+        let a = 0.4_f32;
+        let b = 0.7_f32;
+        for logic in [
+            LogicFamily::Godel,
+            LogicFamily::Product,
+            LogicFamily::Lukasiewicz,
+        ] {
+            assert!(
+                (logic.tnorm_f32(a, b) - logic.tnorm(f64::from(a), f64::from(b)) as f32).abs()
+                    < 1e-6
+            );
+            assert!(
+                (logic.tconorm_f32(a, b) - logic.tconorm(f64::from(a), f64::from(b)) as f32).abs()
+                    < 1e-6
+            );
+            assert!(
+                (logic.residuum_f32(a, b) - logic.residuum(f64::from(a), f64::from(b)) as f32)
+                    .abs()
+                    < 1e-6
+            );
+        }
     }
 
     #[test]

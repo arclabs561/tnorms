@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2] - 2026-07-07
+
+### Added
+
+- Added `LogicFamily` with t-norm, t-conorm, residuum, negation, and `f32`
+  helpers for Godel, Product, and Lukasiewicz logics.
+
 ## [0.1.1] - 2026-07-07
 
 ### Added

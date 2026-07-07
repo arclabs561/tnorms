@@ -12,7 +12,7 @@ Dual-licensed under MIT or Apache-2.0.
 
 ```toml
 [dependencies]
-tnorms = "0.1.1"
+tnorms = "0.1.2"
 ```
 
 ```rust
@@ -34,6 +34,13 @@ Named constants:
 | `GODEL` | `min(a, b)` | `max(a, b)` |
 | `PRODUCT` | `a * b` | `a + b - a * b` |
 | `LUKASIEWICZ` | `max(0, a + b - 1)` | `min(1, a + b)` |
+
+`LogicFamily` also provides the corresponding residual implication:
+
+```rust
+let implication = tnorms::LogicFamily::Product.residuum(0.7, 0.28);
+assert!((implication - 0.4).abs() < 1e-12);
+```
 
 | Family | T-conorm behavior |
 |--------|-------------------|
