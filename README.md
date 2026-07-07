@@ -15,20 +15,28 @@ Dual-licensed under MIT or Apache-2.0.
 
 ```toml
 [dependencies]
-tnorms = "0.1.0"
+tnorms = "0.1.1"
 ```
 
 ```rust
-use tnorms::{tconorm, tnorm, Family};
+use tnorms::{tconorm, tnorm, PRODUCT};
 
-let or_degree = tconorm(Family::Probabilistic, 0.5, 0.6);
-let and_degree = tnorm(Family::Probabilistic, 0.5, 0.6);
+let or_degree = tconorm(PRODUCT, 0.5, 0.6);
+let and_degree = tnorm(PRODUCT, 0.5, 0.6);
 
 assert!((or_degree - 0.8).abs() < 1e-12);
 assert!((and_degree - 0.3).abs() < 1e-12);
 ```
 
 ## Families
+
+Named constants:
+
+| Constant | T-norm | T-conorm |
+|----------|--------|----------|
+| `GODEL` | `min(a, b)` | `max(a, b)` |
+| `PRODUCT` | `a * b` | `a + b - a * b` |
+| `LUKASIEWICZ` | `max(0, a + b - 1)` | `min(1, a + b)` |
 
 | Family | T-conorm behavior |
 |--------|-------------------|

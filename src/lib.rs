@@ -9,6 +9,17 @@
 //! Different families provide different "softness" of the OR operation,
 //! useful in differentiable relaxations and probabilistic reasoning.
 //!
+//! ## Named families
+//!
+//! The constants [`GODEL`], [`PRODUCT`], and [`LUKASIEWICZ`] name the three
+//! common fuzzy-logic families:
+//!
+//! ```
+//! assert_eq!(tnorms::tnorm(tnorms::GODEL, 0.4, 0.7), 0.4);
+//! assert!((tnorms::tnorm(tnorms::PRODUCT, 0.4, 0.7) - 0.28).abs() < 1e-12);
+//! assert!((tnorms::tnorm(tnorms::LUKASIEWICZ, 0.4, 0.7) - 0.1).abs() < 1e-12);
+//! ```
+//!
 //! ## Catalog
 //!
 //! | Family | Formula S(a,b) | Parameter | Behavior |
@@ -117,6 +128,15 @@ pub enum TConormFamily {
 
 /// Short alias for selecting a t-norm/t-conorm family.
 pub type Family = TConormFamily;
+
+/// Godel family: `min(a, b)` t-norm and `max(a, b)` t-conorm.
+pub const GODEL: Family = Family::Maximum;
+
+/// Product family: `a * b` t-norm and `a + b - a * b` t-conorm.
+pub const PRODUCT: Family = Family::Probabilistic;
+
+/// Lukasiewicz family: `max(0, a + b - 1)` t-norm and `min(1, a + b)` t-conorm.
+pub const LUKASIEWICZ: Family = Family::Bounded;
 
 /// The dual t-norm T(a,b) = 1 - S(1-a, 1-b) for a given t-conorm family.
 ///
@@ -250,6 +270,18 @@ mod tests {
         let f = TConormFamily::Probabilistic;
         let t = tnorm(f, 0.5, 0.6);
         assert!((t - 0.3).abs() < 1e-10, "T(0.5,0.6) = {t}, expected 0.3");
+    }
+
+    #[test]
+    fn named_family_constants_match_common_tnorms() {
+        assert!((tnorm(GODEL, 0.4, 0.7) - 0.4).abs() < 1e-12);
+        assert!((tconorm(GODEL, 0.4, 0.7) - 0.7).abs() < 1e-12);
+
+        assert!((tnorm(PRODUCT, 0.4, 0.7) - 0.28).abs() < 1e-12);
+        assert!((tconorm(PRODUCT, 0.4, 0.7) - 0.82).abs() < 1e-12);
+
+        assert!((tnorm(LUKASIEWICZ, 0.4, 0.7) - 0.1).abs() < 1e-12);
+        assert!((tconorm(LUKASIEWICZ, 0.4, 0.7) - 1.0).abs() < 1e-12);
     }
 
     #[test]

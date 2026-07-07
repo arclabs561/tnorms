@@ -1,6 +1,6 @@
 [package]
 name = "tnorms"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.75"
 description = "T-norm and t-conorm families"
@@ -11,7 +11,7 @@ documentation = "https://docs.rs/tnorms"
 readme = "README.md"
 keywords = ["fuzzy-logic", "tnorm", "tconorm", "logic"]
 categories = ["algorithms", "science", "mathematics"]
-include = ["/src/**/*.rs", "/Cargo.toml", "/LICENSE-*", "/README.md"]
+include = ["/src/**/*.rs", "/Cargo.toml", "/CHANGELOG.md", "/LICENSE-*", "/README.md"]
 
 [dependencies]
 
