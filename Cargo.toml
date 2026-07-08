@@ -11,7 +11,14 @@ documentation = "https://docs.rs/tnorms"
 readme = "README.md"
 keywords = ["fuzzy-logic", "tnorm", "tconorm", "logic"]
 categories = ["algorithms", "science", "mathematics"]
-include = ["/src/**/*.rs", "/Cargo.toml", "/CHANGELOG.md", "/LICENSE-*", "/README.md"]
+include = [
+  "/src/**/*.rs",
+  "/examples/**/*.rs",
+  "/Cargo.toml",
+  "/CHANGELOG.md",
+  "/LICENSE-*",
+  "/README.md",
+]
 
 [features]
 default = ["std"]

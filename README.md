@@ -116,3 +116,10 @@ means, and representable uninorms.
 
 Default builds use `std`. `--no-default-features` builds the scalar API without
 `std`; the Burn feature requires `std`.
+
+## Examples
+
+```sh
+cargo run --example logic_table
+cargo run --example aggregation_recipe
+```
