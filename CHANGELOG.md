@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-08
+
 ### Added
 
 - Added `TruthAlgebra` marker types for Godel, Product, and Lukasiewicz logics.

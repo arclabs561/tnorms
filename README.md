@@ -12,7 +12,7 @@ Dual-licensed under MIT or Apache-2.0.
 
 ```toml
 [dependencies]
-tnorms = "0.1.2"
+tnorms = "0.2.0"
 ```
 
 ```rust
