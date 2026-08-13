@@ -127,6 +127,14 @@ fn frank_extreme_s_uses_closed_limits() {
         for &b in &[0.2, 0.5, 0.9] {
             assert_eq!(tconorm(small, a, b), tconorm(maximum, a, b));
             assert_eq!(tconorm(large, a, b), tconorm(bounded, a, b));
+            assert!((tnorm(small, a, b) - tnorm(maximum, a, b)).abs() < 1e-15);
+            assert!((tnorm(large, a, b) - tnorm(bounded, a, b)).abs() < 1e-15);
+            assert!(
+                (residuum(small, a, b).unwrap() - residuum(maximum, a, b).unwrap()).abs() < 1e-15
+            );
+            assert!(
+                (residuum(large, a, b).unwrap() - residuum(bounded, a, b).unwrap()).abs() < 1e-15
+            );
         }
     }
 }
@@ -180,6 +188,21 @@ fn recovered_catalog_limit_cases_match_basic_families() {
                     .abs()
                     < 1e-12
             );
+
+            for (family, expected) in [
+                (
+                    TConormFamily::SchweizerSklar {
+                        p: f64::NEG_INFINITY,
+                    },
+                    GODEL,
+                ),
+                (TConormFamily::SugenoWeber { p: f64::INFINITY }, PRODUCT),
+                (TConormFamily::AczelAlsina { p: f64::INFINITY }, GODEL),
+                (TConormFamily::Yager { p: f64::INFINITY }, GODEL),
+            ] {
+                assert!((tnorm(family, a, b) - tnorm(expected, a, b)).abs() < 1e-15);
+                assert_eq!(residuum(family, a, b), residuum(expected, a, b));
+            }
         }
     }
 }
@@ -279,9 +302,84 @@ fn direct_residua_cover_non_generator_left_continuous_families() {
     assert_eq!(residuum(TConormFamily::Drastic, 0.8, 0.4), None);
     assert!((residuum(TConormFamily::Maximum, 0.8, 0.4).unwrap() - 0.4).abs() < 1e-12);
     assert!((residuum(TConormFamily::NilpotentMinimum, 0.8, 0.4).unwrap() - 0.4).abs() < 1e-12);
-    let mayor = TConormFamily::MayorTorrens { p: 0.4 };
-    let implication = residuum(mayor, 0.8, 0.4).unwrap();
-    assert!(tnorm(mayor, 0.8, implication) <= 0.4 + 1e-10);
+}
+
+fn mayor_torrens_residuum_oracle(p: f64, a: f64, b: f64) -> f64 {
+    let p = p.clamp(0.0, 1.0);
+    let a = a.clamp(0.0, 1.0);
+    let b = b.clamp(0.0, 1.0);
+    if a <= b {
+        1.0
+    } else if a <= p {
+        p - a + b
+    } else {
+        b
+    }
+}
+
+#[test]
+fn mayor_torrens_residuum_matches_closed_form_on_boundaries() {
+    let parameters = [0.0, 0.1, 0.4, 0.9, 1.0];
+    for p in parameters {
+        let values = [
+            0.0,
+            (p - 1e-12_f64).max(0.0),
+            p,
+            (p + 1e-12_f64).min(1.0),
+            0.25,
+            0.5,
+            0.75,
+            1.0,
+        ];
+        let family = TConormFamily::MayorTorrens { p };
+        for &a in &values {
+            for &b in &values {
+                let expected = mayor_torrens_residuum_oracle(p, a, b);
+                let actual = residuum(family, a, b).unwrap();
+                assert!(
+                    (actual - expected).abs() <= 2.0 * f64::EPSILON,
+                    "p={p}, a={a}, b={b}: actual={actual}, expected={expected}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn numeric_residuum_converges_to_mayor_torrens_closed_form() {
+    for (p, a, b) in [
+        (0.4, 0.3, 0.1),
+        (0.4, 0.8, 0.2),
+        (0.9, 0.75, 0.2),
+        (1.0, 0.8, 0.1),
+    ] {
+        let family = TConormFamily::MayorTorrens { p };
+        let expected = mayor_torrens_residuum_oracle(p, a, b);
+        let mut previous_error = f64::INFINITY;
+        for iterations in [1, 2, 8, 16, 32, 64] {
+            let actual = residuum_numeric(family, a, b, iterations);
+            let error = expected - actual;
+            let tolerance = 2.0_f64.powi(-(iterations as i32)) + 2.0 * f64::EPSILON;
+            assert!(
+                actual <= expected + 2.0 * f64::EPSILON,
+                "p={p}, a={a}, b={b}, iterations={iterations}: numeric result exceeded supremum"
+            );
+            assert!(
+                error.abs() <= tolerance,
+                "p={p}, a={a}, b={b}, iterations={iterations}: error={error}, tolerance={tolerance}"
+            );
+            assert!(
+                error.abs() <= previous_error + 2.0 * f64::EPSILON,
+                "p={p}, a={a}, b={b}, iterations={iterations}: error increased"
+            );
+            previous_error = error.abs();
+        }
+    }
+
+    assert_eq!(
+        residuum_numeric(TConormFamily::MayorTorrens { p: 0.4 }, 0.2, 0.3, 0),
+        1.0
+    );
 }
 
 #[test]

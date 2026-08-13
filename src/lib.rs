@@ -316,9 +316,8 @@ impl TConormFamily {
     /// Evaluate the residuum `a -> b` when this family has a known path.
     ///
     /// Archimedean generator families use `f^-1(max(0, f(b) - f(a)))`.
-    /// Godel, nilpotent minimum, and Mayor-Torrens use direct or numeric
-    /// left-continuous t-norm residuation. Drastic returns `None` because it is
-    /// not left-continuous.
+    /// Godel, nilpotent minimum, and Mayor-Torrens use direct residuation.
+    /// Drastic returns `None` because it is not left-continuous.
     pub fn residuum(self, a: f64, b: f64) -> Option<f64> {
         residuum(self, a, b)
     }
@@ -1024,8 +1023,8 @@ pub fn tnorm_generic<T: Float>(family: TConormFamily, a: T, b: T) -> T {
 /// Evaluate the residuum `a -> b` for a t-norm family when available.
 ///
 /// This returns `None` for the drastic product because it is not
-/// left-continuous. Families without a closed generator path use a bounded
-/// numeric supremum over `c` such that `T(a, c) <= b`.
+/// left-continuous. Exact parameter limits are dispatched to the corresponding
+/// named logic rather than evaluated through a degenerate generator.
 pub fn residuum(family: TConormFamily, a: f64, b: f64) -> Option<f64> {
     let a = a.clamp(0.0, 1.0);
     let b = b.clamp(0.0, 1.0);
@@ -1037,7 +1036,19 @@ pub fn residuum(family: TConormFamily, a: f64, b: f64) -> Option<f64> {
         TConormFamily::Maximum => Some(b),
         TConormFamily::NilpotentMinimum => Some((1.0 - a).max(b)),
         TConormFamily::Drastic => None,
-        TConormFamily::MayorTorrens { .. } => Some(residuum_numeric(family, a, b, 64)),
+        TConormFamily::MayorTorrens { p } => {
+            let p = p.clamp(0.0, 1.0);
+            Some(if a <= p { p - a + b } else { b })
+        }
+        TConormFamily::SchweizerSklar { p } if p == f64::NEG_INFINITY => Some(b),
+        TConormFamily::SugenoWeber { p } if p == f64::INFINITY => Some(b / a),
+        TConormFamily::AczelAlsina { p } | TConormFamily::Yager { p } if p == f64::INFINITY => {
+            Some(b)
+        }
+        TConormFamily::Frank { s } if s > 0.0 && s.ln() <= FRANK_MAXIMUM_LIMIT_LOG => Some(b),
+        TConormFamily::Frank { s } if s > 0.0 && s.ln() >= FRANK_BOUNDED_LIMIT_LOG => {
+            Some(1.0 - a + b)
+        }
         _ => family.generator().map(|generator| generator.residuum(a, b)),
     }
 }
