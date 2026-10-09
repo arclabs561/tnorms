@@ -1128,3 +1128,47 @@ mod burn_tests {
         tensor.into_data().to_vec::<f32>().unwrap()
     }
 }
+
+/// Reference values from mpmath at 80 digits for
+/// S(a,b) = 1 - log_s(1 + (s^(1-a)-1)(s^(1-b)-1)/(s-1)).
+#[test]
+fn frank_tconorm_small_s_matches_high_precision_reference() {
+    let cases: &[(f64, f64, f64, f64)] = &[
+        (0.1, 0.2, 1e-20, 0.200_213_918_610_008_12),
+        (0.1, 0.2, 1e-100, 0.200_000_000_000_434_3),
+        (0.9, 0.95, 1e-20, 0.951_871_324_897_031_2),
+        (0.9, 0.95, 1e-100, 0.950_000_043_428_796_8),
+        (0.1, 0.2, 1e-5, 0.217_001_592_965_101_77),
+        (0.1, 0.2, 0.5, 0.274_767_637_697_247_9),
+    ];
+    for &(a, b, s, expected) in cases {
+        let fam = TConormFamily::Frank { s };
+        for (x, y) in [(a, b), (b, a)] {
+            let got = tconorm(fam, x, y);
+            assert!(
+                (got - expected).abs() < 1e-12,
+                "S({x},{y}) at s={s}: got {got}, expected {expected}"
+            );
+        }
+    }
+}
+
+#[test]
+fn frank_tconorm_small_s_keeps_boundary_values() {
+    for &s in &[1e-3, 1e-20, 1e-100] {
+        let fam = TConormFamily::Frank { s };
+        for &v in &[0.0, 0.3, 1.0] {
+            assert!((tconorm(fam, 0.0, v) - v).abs() < 1e-12, "S(0,{v}) s={s}");
+            assert!((tconorm(fam, 1.0, v) - 1.0).abs() < 1e-12, "S(1,{v}) s={s}");
+        }
+    }
+}
+
+#[test]
+fn power_mean_weighted_matches_closed_forms_for_p_not_one() {
+    let w = |i: usize| if i == 0 { 0.25 } else { 0.75 };
+    // sqrt(0.25 * 0.25^2 + 0.75 * 1^2) = sqrt(0.765625) = 0.875
+    assert!((power_mean_weighted(&[0.25, 1.0], 2.0, w).unwrap() - 0.875).abs() < 1e-12);
+    // harmonic: (0.25 / 0.25 + 0.75 / 1)^-1 = 1 / 1.75
+    assert!((power_mean_weighted(&[0.25, 1.0], -1.0, w).unwrap() - 1.0 / 1.75).abs() < 1e-12);
+}

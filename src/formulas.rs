@@ -36,11 +36,40 @@ pub(crate) fn frank_tconorm<T: Float>(a: T, b: T, s: T) -> T {
         return (a + b).min(T::one());
     }
 
+    if log_s < -T::one() {
+        return frank_tconorm_small_base(a, b, log_s);
+    }
+
     let denominator = log_s.exp_m1();
     let left = ((T::one() - a) * log_s).exp_m1();
     let right = ((T::one() - b) * log_s).exp_m1();
 
     clamp01(T::one() - (left * right / denominator).ln_1p() / log_s)
+}
+
+/// Frank t-conorm for `ln s < 0`, written so nothing cancels as `s -> 0`.
+///
+/// With `L = -ln s`, `x = 1-a`, `y = 1-b`, the log argument of
+/// `S = 1 - ln(1 + (s^x-1)(s^y-1)/(s-1)) / ln s` is
+/// `((s^x - s) + s^y (1 - s^x)) / (1 - s)`: a sum of nonnegative terms, taken
+/// in log space. The direct form rounds `1 + (-1)` to zero once `s^x`, `s^y`
+/// fall below machine epsilon.
+fn frank_tconorm_small_base<T: Float>(a: T, b: T, log_s: T) -> T {
+    let l = -log_s;
+    let one = T::one();
+    // ln(s^x - s) = -x*L + ln(1 - s^(1-x)), with 1-x = a.
+    let t1 = -(one - a) * l + (-(-a * l).exp_m1()).ln();
+    // ln(s^y (1 - s^x)).
+    let t2 = -(one - b) * l + (-(-(one - a) * l).exp_m1()).ln();
+    let sum = if t1 == T::neg_infinity() {
+        t2
+    } else if t2 == T::neg_infinity() {
+        t1
+    } else {
+        log_sum_exp_2(t1, t2)
+    };
+    let ln_inner = sum - (-log_s.exp()).ln_1p();
+    clamp01(one - ln_inner / log_s)
 }
 
 pub(crate) fn dombi_tconorm<T: Float>(a: T, b: T, p: T) -> T {
