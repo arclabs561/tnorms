@@ -28,7 +28,7 @@ burn = ["std", "dep:burn", "burn/std", "burn/autodiff"]
 burn-ndarray = ["burn", "dep:burn-ndarray"]
 
 [dependencies]
-burn = { version = "0.20", optional = true, default-features = false }
+burn = { version = "0.21", optional = true, default-features = false }
 burn-ndarray = { version = "0.20", features = ["rayon"], optional = true }
 num-traits = { version = "0.2", default-features = false, features = ["libm"] }
 
