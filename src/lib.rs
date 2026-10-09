@@ -66,6 +66,12 @@
 
 use num_traits::Float;
 
+// Compile and run the README's Rust examples as doctests. One README example
+// uses Burn tensors, so this runs under `--features burn` (CI: burn-ndarray).
+#[cfg(all(doctest, feature = "burn"))]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
+
 mod formulas;
 mod operators;
 mod ordinal;
@@ -105,7 +111,9 @@ pub fn tconorm_generic<T: Float>(family: TConormFamily, a: T, b: T) -> T {
             if denom.abs() < cast(1e-15) {
                 T::one()
             } else {
-                (a + b - cast::<T>(2.0) * a * b) / denom
+                // At a = 1 numerator and denominator are both 1 - b, but they
+                // round differently and the ratio can exceed 1.
+                clamp_result((a + b - cast::<T>(2.0) * a * b) / denom)
             }
         }
         TConormFamily::Yager { p } => {
@@ -1016,7 +1024,7 @@ pub fn tnorm_generic<T: Float>(family: TConormFamily, a: T, b: T) -> T {
         TConormFamily::SugenoWeber { p } => sugeno_weber_tnorm(a, b, cast(p)),
         TConormFamily::AczelAlsina { p } => aczel_alsina_tnorm(a, b, cast(p)),
         TConormFamily::MayorTorrens { p } => mayor_torrens_tnorm(a, b, cast(p)),
-        _ => T::one() - tconorm_generic(family, T::one() - a, T::one() - b),
+        _ => clamp_result(T::one() - tconorm_generic(family, T::one() - a, T::one() - b)),
     }
 }
 

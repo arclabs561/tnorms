@@ -117,6 +117,27 @@ means, and representable uninorms.
 Default builds use `std`. `--no-default-features` builds the scalar API without
 `std`; the Burn feature requires `std`.
 
+## Which API to use
+
+The three standard logics are reachable four ways, and all four compute the
+same values:
+
+| API | Use it when |
+|-----|-------------|
+| `tnorm(family, a, b)`, `tconorm(family, a, b)`, folds | You need the full parametric catalog (`TConormFamily`: Frank, Yager, Dombi, ...) |
+| Methods on `TConormFamily` (`PRODUCT.tnorm(a, b)`) | The same catalog with method syntax |
+| `LogicFamily` (`Godel`, `Product`, `Lukasiewicz`) | You need the residuum and negation as an adjoint pair, their gradients, `f32` variants, or Burn tensors |
+| `TruthAlgebra` marker types (`Godel`, `Product`, `Lukasiewicz`) | The logic is a compile-time type parameter |
+
+`TConormFamily` is named after its t-conorm, and each variant also defines the
+dual t-norm `T(a, b) = 1 - S(1 - a, 1 - b)`. `PRODUCT` is the `Probabilistic`
+variant, so `tnorm(PRODUCT, a, b)` is `a * b` and `tconorm(PRODUCT, a, b)` is
+`a + b - a * b`.
+
+Inputs outside `[0, 1]` are clamped to `[0, 1]` by every family. `tnorm` and
+`tconorm` treat NaN as 0; the residuum, gradient and fold functions can return
+NaN for NaN input.
+
 ## Examples
 
 ```sh

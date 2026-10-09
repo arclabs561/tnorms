@@ -14,6 +14,18 @@ pub(crate) fn clamp01<T: Float>(value: T) -> T {
     value.max(T::zero()).min(T::one())
 }
 
+/// Clamp a computed result to `[0, 1]` without turning NaN into a number, so
+/// rounding cannot push an output outside the unit interval.
+pub(crate) fn clamp_result<T: Float>(value: T) -> T {
+    if value > T::one() {
+        T::one()
+    } else if value < T::zero() {
+        T::zero()
+    } else {
+        value
+    }
+}
+
 pub(crate) fn scaled_lp_norm_2<T: Float>(a: T, b: T, p: T) -> T {
     let scale = a.max(b);
     if scale <= T::zero() {
