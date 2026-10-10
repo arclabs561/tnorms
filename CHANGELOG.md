@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-09
+
+### Fixed
+
+- The Frank t-conorm uses a stable form when `ln s < -1`. The direct form
+  cancelled to 0 once `s^(1-a)` fell below machine epsilon (for example
+  0.2227 at `s = 1e-20` and 0 for smaller `s`).
+- The Hamacher t-conorm and t-norms computed as the dual of a t-conorm clamp
+  their results to `[0, 1]`. Rounding previously gave `1.0000000000000002`
+  for Hamacher at `a = 1` and `-2.2e-16` for a dual t-norm at `a = 0`. NaN
+  inputs still produce NaN.
+- `residuum` for `MayorTorrens` uses its closed form instead of a numeric
+  supremum. Parameter limits dispatch to the matching basic logic:
+  `SchweizerSklar` at `p = -inf`, `AczelAlsina` and `Yager` at `p = inf`,
+  and Frank with `ln s <= -350` give the Godel residuum; `SugenoWeber` at
+  `p = inf` gives the Product residuum; Frank with `ln s >= 350` gives the
+  Lukasiewicz residuum.
+
 ## [0.2.0] - 2026-07-08
 
 ### Added
