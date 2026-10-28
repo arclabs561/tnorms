@@ -126,7 +126,7 @@ same values:
 |-----|-------------|
 | `tnorm(family, a, b)`, `tconorm(family, a, b)`, folds | You need the full parametric catalog (`TConormFamily`: Frank, Yager, Dombi, ...) |
 | Methods on `TConormFamily` (`PRODUCT.tnorm(a, b)`) | The same catalog with method syntax |
-| `LogicFamily` (`Godel`, `Product`, `Lukasiewicz`) | You need the residuum and negation as an adjoint pair, their gradients, `f32` variants, or Burn tensors |
+| `LogicFamily` (`Godel`, `Product`, `Lukasiewicz`) | You need the t-norm and residuum as an adjoint pair, residual negation, gradients, `f32` variants, or Burn tensors |
 | `TruthAlgebra` marker types (`Godel`, `Product`, `Lukasiewicz`) | The logic is a compile-time type parameter |
 
 `TConormFamily` is named after its t-conorm, and each variant also defines the
