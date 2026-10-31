@@ -1,4 +1,4 @@
-use crate::{tconorm, tnorm, LogicFamily, TConormFamily, FRANK_PRODUCT_LIMIT_EPS};
+use crate::{tconorm, tnorm_dual, LogicFamily, TConormFamily, FRANK_PRODUCT_LIMIT_EPS};
 #[cfg(not(feature = "std"))]
 use num_traits::Float;
 
@@ -210,11 +210,11 @@ pub fn representable_uninorm(
         return tconorm(tconorm_family, a, b);
     }
     if e >= 1.0 {
-        return tnorm(tnorm_family, a, b);
+        return tnorm_dual(tnorm_family, a, b);
     }
 
     if a <= e && b <= e {
-        e * tnorm(tnorm_family, a / e, b / e)
+        e * tnorm_dual(tnorm_family, a / e, b / e)
     } else if a >= e && b >= e {
         e + (1.0 - e) * tconorm(tconorm_family, (a - e) / (1.0 - e), (b - e) / (1.0 - e))
     } else {
