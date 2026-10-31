@@ -107,6 +107,50 @@ pub(crate) fn log_sum_exp_2<T: Float>(a: T, b: T) -> T {
     max + ((a - max).exp() + (b - max).exp()).ln()
 }
 
+/// Hamacher product `T(a, b) = ab / (a + b - ab)`.
+///
+/// The denominator is written as `x + y (1 - x)` with `x = max(a, b)` and
+/// `y = min(a, b)`: a sum of nonnegative terms, so nothing cancels, and it is
+/// exactly 1 when `x = 1`. That makes `T(y, 1) = y` and `T(y, 0) = 0` exact.
+/// Computing `T` as the dual `1 - S(1-a, 1-b)` cancelled near `a = 1`.
+pub(crate) fn hamacher_tnorm<T: Float>(a: T, b: T) -> T {
+    let (x, y) = if a >= b { (a, b) } else { (b, a) };
+    let denominator = x + y * (T::one() - x);
+    if denominator <= T::zero() {
+        return T::zero();
+    }
+    clamp_result(a * b / denominator)
+}
+
+/// Hamacher t-conorm `S(a, b) = (a + b - 2ab) / (1 - ab)`, written as
+/// `S = x + y (1-x)^2 / (1 - xy)` with `x = max(a, b)` and `y = min(a, b)`.
+///
+/// The correction term is at most `1 - x`, so the cancellation in `1 - xy`
+/// near `(1, 1)` costs no more than an ulp of the result, and the identities
+/// `S(y, 0) = y` and `S(y, 1) = 1` are exact. The denominator is formed as
+/// `(1 - y) + y (1 - x)`, which does not cancel.
+pub(crate) fn hamacher_tconorm<T: Float>(a: T, b: T) -> T {
+    let (x, y) = if a >= b { (a, b) } else { (b, a) };
+    let gap = T::one() - x;
+    let denominator = (T::one() - y) + y * gap;
+    if denominator <= T::zero() {
+        // x = y = 1.
+        return T::one();
+    }
+    clamp_result(x + y * gap * gap / denominator)
+}
+
+/// `ln(1 - e^t)` for `t < 0` without cancellation: `ln_1p(-e^t)` when `e^t`
+/// is small and `ln(-expm1(t))` when it is close to 1 (the `log1mexp`
+/// split of Maechler, "Accurately Computing log(1 - exp(-|a|))", 2012).
+pub(crate) fn ln_one_minus_exp(t: f64) -> f64 {
+    if t < -core::f64::consts::LN_2 {
+        (-t.exp()).ln_1p()
+    } else {
+        (-t.exp_m1()).ln()
+    }
+}
+
 pub(crate) fn drastic_tnorm<T: Float>(a: T, b: T) -> T {
     if a >= T::one() {
         b
@@ -153,22 +197,31 @@ pub(crate) fn schweizer_sklar_tnorm<T: Float>(a: T, b: T, p: T) -> T {
     if p.abs() <= cast(FRANK_PRODUCT_LIMIT_EPS) {
         return a * b;
     }
-    if p < T::zero() && (a <= T::zero() || b <= T::zero()) {
+    let (x, y) = if a >= b { (a, b) } else { (b, a) };
+    if y <= T::zero() {
+        // p > 0: (x^p - 1)^(1/p) clamps to 0; p < 0: the zero is absorbing.
         return T::zero();
     }
 
-    let ap = (p * a.ln()).exp();
-    let bp = (p * b.ln()).exp();
-    let inner = if p > T::zero() {
-        (ap + bp - T::one()).max(T::zero())
-    } else {
-        ap + bp - T::one()
-    };
-    if inner <= T::zero() {
-        T::zero()
-    } else {
-        clamp01(inner.powf(T::one() / p))
+    // T = (x^p + y^p - 1)^(1/p) = y (1 + (x^p - 1) / y^p)^(1/p), with
+    // x = max(a, b), y = min(a, b). Forming x^p + y^p - 1 directly loses
+    // y^p next to 1 (for p = 20, T(0.05, 1) came out as 0). Here x^p - 1 is
+    // expm1(p ln x), exactly 0 at x = 1, so T(y, 1) = y.
+    let x_power_minus_one = (p * x.ln()).exp_m1();
+    if x_power_minus_one == T::zero() {
+        return y;
     }
+    let ratio = if x_power_minus_one.is_finite() {
+        x_power_minus_one * (-p * y.ln()).exp()
+    } else {
+        // p < 0 and x^p overflows: (x^p - 1) / y^p = (x/y)^p - y^-p, and
+        // y^-p < x^-p underflows, since y <= x.
+        (p * (x.ln() - y.ln())).exp()
+    };
+    if ratio <= -T::one() {
+        return T::zero();
+    }
+    clamp_result(y * (ratio.ln_1p() / p).exp())
 }
 
 pub(crate) fn sugeno_weber_tnorm<T: Float>(a: T, b: T, p: T) -> T {
@@ -238,6 +291,11 @@ pub(crate) fn hamacher_generator_inverse(y: f64, p: f64) -> f64 {
     }
 }
 
+/// Frank generator `f(x) = ln((s - 1) / (s^x - 1))`.
+///
+/// For `s < 1` this is `ln(1 - s) - ln(1 - s^x)`, with each term from
+/// [`ln_one_minus_exp`]. The quotient form rounds to `ln(1) = 0` once `s^x`
+/// falls below machine epsilon, which loses the whole value.
 pub(crate) fn frank_generator(x: f64, s: f64) -> f64 {
     if (s - 1.0).abs() <= FRANK_PRODUCT_LIMIT_EPS {
         return crate::GeneratorFamily::Product.value(x);
@@ -248,14 +306,37 @@ pub(crate) fn frank_generator(x: f64, s: f64) -> f64 {
     if x >= 1.0 {
         return 0.0;
     }
-    ((s - 1.0) / (x * s.ln()).exp_m1()).ln()
+    let log_s = s.ln();
+    if log_s < 0.0 {
+        (ln_one_minus_exp(log_s) - ln_one_minus_exp(x * log_s)).max(0.0)
+    } else {
+        (log_s.exp_m1().ln() - (x * log_s).exp_m1().ln()).max(0.0)
+    }
 }
 
+/// Frank generator inverse `f^-1(y) = ln(1 + (s - 1) e^-y) / ln s`.
+///
+/// For `s < 1` the log argument `1 - (1 - s) e^-y` is written as
+/// `(1 - e^-y) + s e^-y`, a sum of nonnegative terms, when `(1 - s) e^-y`
+/// is close to 1, and taken through `ln_1p` when it is small; the direct
+/// form rounds `1 + (s - 1)` to 0 for small `s` and `y` and returns
+/// `ln(0) / ln s = +inf`. For `s > 1` it is `ln_1p((s - 1) e^-y)`.
 pub(crate) fn frank_generator_inverse(y: f64, s: f64) -> f64 {
     if (s - 1.0).abs() <= FRANK_PRODUCT_LIMIT_EPS {
         return crate::GeneratorFamily::Product.inverse(y);
     }
-    (1.0 + (s - 1.0) * (-y).exp()).ln() / s.ln()
+    let log_s = s.ln();
+    let value = if log_s < 0.0 {
+        let shrink = -log_s.exp_m1() * (-y).exp(); // (1 - s) e^-y
+        if shrink < 0.5 {
+            (-shrink).ln_1p() / log_s
+        } else {
+            (-(-y).exp_m1() + (log_s - y).exp()).ln() / log_s
+        }
+    } else {
+        (log_s.exp_m1() * (-y).exp()).ln_1p() / log_s
+    };
+    value.clamp(0.0, 1.0)
 }
 
 pub(crate) fn min_gradient(a: f64, b: f64) -> BinaryGradient<f64> {
