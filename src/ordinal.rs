@@ -1,4 +1,4 @@
-use crate::{tconorm, tnorm, TConormFamily};
+use crate::{tconorm, tnorm_dual, TConormFamily};
 
 /// One interval of an ordinal-sum t-norm or t-conorm.
 ///
@@ -72,7 +72,7 @@ impl<'a> OrdinalSum<'a> {
                 let width = segment.upper - segment.lower;
                 let local_a = (a - segment.lower) / width;
                 let local_b = (b - segment.lower) / width;
-                return segment.lower + width * tnorm(segment.family, local_a, local_b);
+                return segment.lower + width * tnorm_dual(segment.family, local_a, local_b);
             }
         }
         a.min(b)

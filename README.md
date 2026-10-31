@@ -16,13 +16,17 @@ tnorms = "0.2.1"
 ```
 
 ```rust
-use tnorms::{tconorm, tnorm, PRODUCT};
+use tnorms::{LogicFamily, Product, TNorm};
 
-let or_degree = tconorm(PRODUCT, 0.5, 0.6);
-let and_degree = tnorm(PRODUCT, 0.5, 0.6);
+let product = LogicFamily::Product;
+let and_degree = product.tnorm(0.5, 0.6);
+let or_degree = product.tconorm(0.5, 0.6);
 
 assert!((or_degree - 0.8).abs() < 1e-12);
 assert!((and_degree - 0.3).abs() < 1e-12);
+
+// The same conjunction with the logic as a compile-time type parameter.
+assert_eq!(<Product as TNorm>::tnorm(0.5, 0.6), and_degree);
 ```
 
 ## Families
@@ -119,20 +123,30 @@ Default builds use `std`. `--no-default-features` builds the scalar API without
 
 ## Which API to use
 
-The three standard logics are reachable four ways, and all four compute the
-same values:
+The three standard logics are reachable several ways, and every route
+computes the same values:
 
 | API | Use it when |
 |-----|-------------|
-| `tnorm(family, a, b)`, `tconorm(family, a, b)`, folds | You need the full parametric catalog (`TConormFamily`: Frank, Yager, Dombi, ...) |
-| Methods on `TConormFamily` (`PRODUCT.tnorm(a, b)`) | The same catalog with method syntax |
-| `LogicFamily` (`Godel`, `Product`, `Lukasiewicz`) | You need the t-norm and residuum as an adjoint pair, residual negation, gradients, `f32` variants, or Burn tensors |
-| `TruthAlgebra` marker types (`Godel`, `Product`, `Lukasiewicz`) | The logic is a compile-time type parameter |
+| `TNorm` marker types (`<Product as TNorm>::tnorm(a, b)`) | The t-norm and residuum are the primary pair and the logic is a compile-time type parameter |
+| `LogicFamily` (`Godel`, `Product`, `Lukasiewicz`) | The same pair at runtime, plus gradients, `f32` variants, or Burn tensors |
+| `tconorm(family, a, b)`, folds | You need the full parametric catalog (`TConormFamily`: Frank, Yager, Dombi, ...) |
+| `TruthAlgebra` marker types (`Godel`, `Product`, `Lukasiewicz`) | Type-level selection of the full algebra, including gradients and tensors |
+| `tnorm(family, a, b)` (deprecated) | Legacy code only; use `TNorm` or `LogicFamily` instead |
 
-`TConormFamily` is named after its t-conorm, and each variant also defines the
-dual t-norm `T(a, b) = 1 - S(1 - a, 1 - b)`. `PRODUCT` is the `Probabilistic`
-variant, so `tnorm(PRODUCT, a, b)` is `a * b` and `tconorm(PRODUCT, a, b)` is
-`a + b - a * b`.
+`TConormFamily` is an aggregation catalog named after its t-conorm. Each
+variant also exposes the dual t-norm `T(a, b) = 1 - S(1 - a, 1 - b)`, but that
+route is deprecated: the t-norm and its residuum are the primary pair, so
+prefer `TNorm` or `LogicFamily`. `PRODUCT` is the `Probabilistic` variant, so
+`tconorm(PRODUCT, a, b)` is `a + b - a * b` and the deprecated
+`tnorm(PRODUCT, a, b)` is still `a * b`.
+
+Residual negation is `¬a = a → 0` (`TNorm::negation`, `LogicFamily::neg`).
+It is involutive only for Lukasiewicz; `Godel` and `Product` give a two-valued
+negation, so `¬¬a = a` does not hold. That is why each built-in family overrides
+`tconorm` with the standard-negation dual: the literal duality
+`a ⊕ b = ¬(¬a ⊗ ¬b)` collapses to the constant `1` under a non-involutive
+negation.
 
 Inputs outside `[0, 1]` are clamped to `[0, 1]` by every family. `tnorm` and
 `tconorm` treat NaN as 0; the residuum, gradient and fold functions can return

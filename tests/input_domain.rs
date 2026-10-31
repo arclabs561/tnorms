@@ -4,6 +4,8 @@
 //! give exactly the value at the nearest endpoint. NaN must never panic, and
 //! the t-norm and t-conorm of any family must stay inside `[0, 1]`.
 
+#![allow(deprecated)] // exercises the deprecated catalog t-norm
+
 use tnorms::{
     power_mean_weighted, residuum, tconorm, tconorm_fold, tconorm_gradient, tnorm, tnorm_fold,
     tnorm_gradient, BinaryGradient, LogicFamily, TConormFamily,

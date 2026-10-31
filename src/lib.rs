@@ -9,6 +9,25 @@
 //! Different families provide different "softness" of the OR operation,
 //! useful in differentiable relaxations and probabilistic reasoning.
 //!
+//! ## Primary surface
+//!
+//! Fuzzy logic is built on a left-continuous t-norm and its residuum; the
+//! t-conorm is their dual under a strong negation. [`TNorm`] is that primary
+//! surface for the three standard logics, and [`LogicFamily`] is the runtime
+//! equivalent:
+//!
+//! ```
+//! use tnorms::{LogicFamily, Lukasiewicz, TNorm};
+//!
+//! assert!((<Lukasiewicz as TNorm>::tnorm(0.4, 0.7) - 0.1).abs() < 1e-12);
+//! assert!((<Lukasiewicz as TNorm>::residuum(0.7, 0.4) - 0.7).abs() < 1e-12);
+//! assert!((<Lukasiewicz as TNorm>::negation(0.4) - 0.6).abs() < 1e-12);
+//! assert_eq!(
+//!     <Lukasiewicz as TNorm>::tconorm(0.4, 0.7),
+//!     LogicFamily::Lukasiewicz.tconorm(0.4, 0.7)
+//! );
+//! ```
+//!
 //! ## Named families
 //!
 //! The constants [`GODEL`], [`PRODUCT`], and [`LUKASIEWICZ`] name the three
@@ -16,9 +35,9 @@
 //! residuum for implication:
 //!
 //! ```
-//! assert_eq!(tnorms::tnorm(tnorms::GODEL, 0.4, 0.7), 0.4);
-//! assert!((tnorms::tnorm(tnorms::PRODUCT, 0.4, 0.7) - 0.28).abs() < 1e-12);
-//! assert!((tnorms::tnorm(tnorms::LUKASIEWICZ, 0.4, 0.7) - 0.1).abs() < 1e-12);
+//! assert_eq!(tnorms::LogicFamily::Godel.tnorm(0.4, 0.7), 0.4);
+//! assert!((tnorms::LogicFamily::Product.tnorm(0.4, 0.7) - 0.28).abs() < 1e-12);
+//! assert!((<tnorms::Lukasiewicz as tnorms::TNorm>::tnorm(0.4, 0.7) - 0.1).abs() < 1e-12);
 //! assert_eq!(tnorms::LogicFamily::Godel.residuum(0.7, 0.4), 0.4);
 //! assert_eq!(tnorms::LogicFamily::Product.tnorm_gradient(0.4, 0.7).da, 0.7);
 //! ```
@@ -32,9 +51,11 @@
 //! assert!((Product::tnorm_f32(0.4, 0.7) - 0.28).abs() < 1e-6);
 //! ```
 //!
-//! The generic [`TConormFamily`] catalog is an aggregation catalog.
-//! [`residuum`] is available for families with a known left-continuous path;
-//! [`LogicFamily`] remains the standard fuzzy-logic surface where the t-norm
+//! The generic [`TConormFamily`] catalog is an aggregation catalog: it names
+//! t-conorm formulas and derives a dual t-norm where useful. Its `tnorm`
+//! functions are deprecated in favour of [`TNorm`]; [`residuum`] remains
+//! available for catalog families with a known left-continuous path.
+//! [`LogicFamily`] remains the runtime fuzzy-logic surface where the t-norm
 //! and residuum form the adjoint pair by construction.
 //!
 //! ## Catalog
@@ -301,15 +322,28 @@ impl TConormFamily {
     }
 
     /// Evaluate this family's standard-negation dual t-norm.
+    ///
+    /// Deprecated: a t-norm is not defined by its t-conorm. Use [`TNorm`] or
+    /// [`LogicFamily::tnorm`]. The value is unchanged.
+    #[deprecated(
+        since = "0.2.2",
+        note = "the t-norm is primary: use `TNorm` (for example `<Product as TNorm>::tnorm`) or `LogicFamily::tnorm`; the `TConormFamily` t-norm is scheduled for removal in 0.3.0"
+    )]
     #[inline]
     pub fn tnorm(self, a: f64, b: f64) -> f64 {
-        tnorm(self, a, b)
+        tnorm_dual(self, a, b)
     }
 
     /// Evaluate this family's standard-negation dual t-norm with a generic float type.
+    ///
+    /// Deprecated with [`TConormFamily::tnorm`].
+    #[deprecated(
+        since = "0.2.2",
+        note = "the t-norm is primary: use `TNorm` or `LogicFamily::tnorm`; the `TConormFamily` t-norm is scheduled for removal in 0.3.0"
+    )]
     #[inline]
     pub fn tnorm_generic<T: Float>(self, a: T, b: T) -> T {
-        tnorm_generic(self, a, b)
+        tnorm_dual_generic(self, a, b)
     }
 
     /// Evaluate the residuum `a -> b` when this family has a known path.
@@ -564,8 +598,11 @@ impl LogicFamily {
     }
 
     /// Evaluate the t-norm conjunction.
+    ///
+    /// This is the primary conjunction of the logic; [`crate::TNorm`] exposes
+    /// the same function at the type level.
     pub fn tnorm(self, a: f64, b: f64) -> f64 {
-        tnorm(self.family(), a, b)
+        tnorm_dual(self.family(), a, b)
     }
 
     /// Evaluate the dual t-conorm disjunction.
@@ -848,6 +885,69 @@ impl LogicFamily {
     }
 }
 
+/// A left-continuous t-norm paired with its residuum.
+///
+/// In fuzzy logic the t-norm `⊗` and its residuum `→` are the primary adjoint
+/// pair. The residuum is the largest `c` with `a ⊗ c <= b`, so
+///
+/// ```text
+/// a ⊗ b <= c   iff   a <= (b → c)
+/// ```
+///
+/// holds for every `a`, `b`, `c` in `[0, 1]`. The t-conorm is the dual of this
+/// pair under a strong negation; [`TConormFamily`] is an aggregation catalog,
+/// not the definition of the t-norm.
+///
+/// The implementors are the zero-sized logic markers [`Godel`], [`Product`]
+/// and [`Lukasiewicz`]. They delegate to [`LogicFamily`], so every value is
+/// bit-identical to the corresponding `LogicFamily` method.
+///
+/// ```
+/// use tnorms::{LogicFamily, Product, TNorm};
+///
+/// assert_eq!(Product::NAME, "product");
+/// assert_eq!(
+///     <Product as TNorm>::tnorm(0.4, 0.7),
+///     LogicFamily::Product.tnorm(0.4, 0.7)
+/// );
+/// assert!((<Product as TNorm>::residuum(0.7, 0.28) - 0.4).abs() < 1e-12);
+/// assert!((<Product as TNorm>::tconorm(0.5, 0.6) - 0.8).abs() < 1e-12);
+/// ```
+///
+/// [`TNorm::tnorm`], [`TNorm::residuum`] and [`TNorm::tconorm`] share their
+/// names with [`TruthAlgebra`]. With both traits imported, an unqualified
+/// `Product::tnorm(a, b)` is ambiguous; qualify it as
+/// `<Product as TNorm>::tnorm(a, b)`, or import one trait at a time.
+pub trait TNorm {
+    /// Stable lower-case family name, for example `"product"`.
+    const NAME: &'static str;
+
+    /// Evaluate the t-norm conjunction `a ⊗ b`.
+    fn tnorm(a: f64, b: f64) -> f64;
+
+    /// Evaluate the residuum `a → b`, the right adjoint of the t-norm.
+    fn residuum(a: f64, b: f64) -> f64;
+
+    /// Evaluate the residual negation `¬a = a → 0`.
+    ///
+    /// This is the negation induced by the adjoint pair, not an arbitrary
+    /// strong negation. It is involutive only for Łukasiewicz.
+    fn negation(a: f64) -> f64 {
+        Self::residuum(a, 0.0)
+    }
+
+    /// Evaluate the dual t-conorm `a ⊕ b = ¬(¬a ⊗ ¬b)`.
+    ///
+    /// The default is the duality identity for an implementor whose
+    /// [`negation`](TNorm::negation) is strong (involutive). Godel and Product
+    /// residuate to a non-involutive negation, under which this identity
+    /// collapses to the constant `1`, so the built-in families override it and
+    /// return the standard-negation dual instead.
+    fn tconorm(a: f64, b: f64) -> f64 {
+        Self::negation(Self::tnorm(Self::negation(a), Self::negation(b)))
+    }
+}
+
 /// A standard residuated truth algebra on degrees in `[0, 1]`.
 ///
 /// This trait is for type-level selection of the common fuzzy-logic families.
@@ -1042,15 +1142,109 @@ impl TruthAlgebra for Lukasiewicz {
     const FAMILY: LogicFamily = LogicFamily::Lukasiewicz;
 }
 
+impl TNorm for Godel {
+    const NAME: &'static str = "godel";
+
+    #[inline]
+    fn tnorm(a: f64, b: f64) -> f64 {
+        LogicFamily::Godel.tnorm(a, b)
+    }
+
+    #[inline]
+    fn residuum(a: f64, b: f64) -> f64 {
+        LogicFamily::Godel.residuum(a, b)
+    }
+
+    #[inline]
+    fn negation(a: f64) -> f64 {
+        LogicFamily::Godel.neg(a)
+    }
+
+    #[inline]
+    fn tconorm(a: f64, b: f64) -> f64 {
+        LogicFamily::Godel.tconorm(a, b)
+    }
+}
+
+impl TNorm for Product {
+    const NAME: &'static str = "product";
+
+    #[inline]
+    fn tnorm(a: f64, b: f64) -> f64 {
+        LogicFamily::Product.tnorm(a, b)
+    }
+
+    #[inline]
+    fn residuum(a: f64, b: f64) -> f64 {
+        LogicFamily::Product.residuum(a, b)
+    }
+
+    #[inline]
+    fn negation(a: f64) -> f64 {
+        LogicFamily::Product.neg(a)
+    }
+
+    #[inline]
+    fn tconorm(a: f64, b: f64) -> f64 {
+        LogicFamily::Product.tconorm(a, b)
+    }
+}
+
+impl TNorm for Lukasiewicz {
+    const NAME: &'static str = "lukasiewicz";
+
+    #[inline]
+    fn tnorm(a: f64, b: f64) -> f64 {
+        LogicFamily::Lukasiewicz.tnorm(a, b)
+    }
+
+    #[inline]
+    fn residuum(a: f64, b: f64) -> f64 {
+        LogicFamily::Lukasiewicz.residuum(a, b)
+    }
+
+    #[inline]
+    fn negation(a: f64) -> f64 {
+        LogicFamily::Lukasiewicz.neg(a)
+    }
+
+    #[inline]
+    fn tconorm(a: f64, b: f64) -> f64 {
+        LogicFamily::Lukasiewicz.tconorm(a, b)
+    }
+}
+
 /// The dual t-norm T(a,b) = 1 - S(1-a, 1-b) for a given t-conorm family.
 ///
-/// T-norms generalize logical AND.
+/// T-norms generalize logical AND. The t-norm is primary, so this
+/// t-conorm-first route is deprecated in favour of [`TNorm`] or
+/// [`LogicFamily::tnorm`]. The value is unchanged.
+#[deprecated(
+    since = "0.2.2",
+    note = "the t-norm is primary: use `TNorm` (for example `<Product as TNorm>::tnorm`) or `LogicFamily::tnorm`; the `TConormFamily` t-norm is scheduled for removal in 0.3.0"
+)]
 pub fn tnorm(family: TConormFamily, a: f64, b: f64) -> f64 {
-    tnorm_generic(family, a, b)
+    tnorm_dual(family, a, b)
 }
 
 /// Evaluate the standard-negation dual t-norm for a generic float type.
+///
+/// Deprecated with [`tnorm`]: the t-norm is primary and should not be derived
+/// from a t-conorm family.
+#[deprecated(
+    since = "0.2.2",
+    note = "the t-norm is primary: use `TNorm` or `LogicFamily::tnorm`; the `TConormFamily` t-norm is scheduled for removal in 0.3.0"
+)]
 pub fn tnorm_generic<T: Float>(family: TConormFamily, a: T, b: T) -> T {
+    tnorm_dual_generic(family, a, b)
+}
+
+/// Non-deprecated implementation behind [`tnorm`].
+pub(crate) fn tnorm_dual(family: TConormFamily, a: f64, b: f64) -> f64 {
+    tnorm_dual_generic(family, a, b)
+}
+
+fn tnorm_dual_generic<T: Float>(family: TConormFamily, a: T, b: T) -> T {
     let a = clamp01(a);
     let b = clamp01(b);
     match family {
@@ -1113,7 +1307,7 @@ pub fn residuum_numeric(family: TConormFamily, a: f64, b: f64, iterations: usize
     let mut hi = 1.0;
     for _ in 0..iterations {
         let mid = (lo + hi) * 0.5;
-        if tnorm(family, a, mid) <= b {
+        if tnorm_dual(family, a, mid) <= b {
             lo = mid;
         } else {
             hi = mid;
@@ -1180,7 +1374,9 @@ pub fn tnorm_fold(family: TConormFamily, values: &[f64]) -> f64 {
         _ => values
             .iter()
             .skip(1)
-            .fold(values[0].clamp(0.0, 1.0), |acc, &v| tnorm(family, acc, v)),
+            .fold(values[0].clamp(0.0, 1.0), |acc, &v| {
+                tnorm_dual(family, acc, v)
+            }),
     }
 }
 

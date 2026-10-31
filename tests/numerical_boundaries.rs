@@ -5,6 +5,8 @@
 //! Norms*, 2000, Definition 1.1). These hold over a grid that includes values
 //! within `1e-12` of 0 and 1, where the naive closed forms lose digits.
 
+#![allow(deprecated)] // exercises the deprecated catalog t-norm
+
 use tnorms::{residuum, tconorm, tnorm, GeneratorFamily, TConormFamily};
 
 /// 0, 1/1000, ..., 1, plus points close to 0 and 1.

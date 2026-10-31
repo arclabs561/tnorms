@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Added
+
+- `TNorm`, the primary t-norm surface: `NAME`, `tnorm`, `residuum`,
+  `negation`, and a provided `tconorm` derived by duality. It is implemented
+  for the `Godel`, `Product` and `Lukasiewicz` marker types and delegates to
+  `LogicFamily`, so every value is bit-identical.
+- Adjunction tests (`a ⊗ b <= c` iff `a <= b → c`, tolerance `1e-12`) over a
+  grid for the three logics, plus a negation-involution test that only
+  Łukasiewicz satisfies.
+
+### Deprecated
+
+- `tnorm(TConormFamily, ..)`, `tnorm_generic`, and the
+  `TConormFamily::tnorm`/`TConormFamily::tnorm_generic` methods. The t-norm is
+  not defined by its t-conorm; use `TNorm` or `LogicFamily::tnorm`. Values are
+  unchanged and the items are scheduled for removal in 0.3.0.
+
 ### Fixed
 
 - Hamacher's t-norm uses the Hamacher product `ab / (a + b - ab)` directly,

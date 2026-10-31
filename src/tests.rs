@@ -1,3 +1,7 @@
+//! Unit tests. The deprecated `TConormFamily` t-norm route is exercised on
+//! purpose to prove it keeps its behaviour until removal.
+#![allow(deprecated)]
+
 use super::*;
 use proptest::prelude::*;
 
