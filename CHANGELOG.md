@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Hamacher's t-norm uses the Hamacher product `ab / (a + b - ab)` directly,
+  and its t-conorm is computed as `x + y (1-x)^2 / (1 - xy)` with
+  `x = max(a, b)`, `y = min(a, b)`. The t-norm was the dual of
+  `(a + b - 2ab) / (1 - ab)`, which cancels near 1: `T(1e-12, 0)` was
+  `1.1e-4` and `S(1 - 1e-12, 1)` was `0.99989`. The identities `T(x, 1) = x`,
+  `T(x, 0) = 0`, `S(x, 0) = x` and `S(x, 1) = 1` are now exact.
+- The Schweizer-Sklar t-norm forms `x^p - 1` with `expm1`, so `T(x, 1) = x`
+  holds exactly for every `p`. `(x^p + 1) - 1` lost `x^p` for large `p`:
+  `T(0.05, 1)` was 0 at `p = 20`.
+- `GeneratorFamily::residuum` (and `residuum` for Archimedean families) no
+  longer returns 1 when the generator overflows. `f(b) - f(a)` was
+  `inf - inf = NaN`, so Dombi with `p = 50` gave `residuum(1e-12, 0) = 1`
+  instead of 0. A zero consequent of a strict generator now gives 0, and
+  overflowing Dombi, Aczel-Alsina and negative-`p` Schweizer-Sklar values
+  are subtracted in log space.
+- The Frank generator and its inverse stay accurate for small `s`. The
+  inverse computed `ln(1 + (s - 1) e^-y)`, which reached `ln(0)` and
+  returned `+inf` for `GeneratorFamily::Frank { s: 1e-200 }.tnorm(0.1, 0.1)`.
+
 ## [0.2.1] - 2026-10-09
 
 ### Fixed

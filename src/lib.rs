@@ -106,16 +106,7 @@ pub fn tconorm_generic<T: Float>(family: TConormFamily, a: T, b: T) -> T {
                 (a + b) / denom
             }
         }
-        TConormFamily::Hamacher => {
-            let denom = T::one() - a * b;
-            if denom.abs() < cast(1e-15) {
-                T::one()
-            } else {
-                // At a = 1 numerator and denominator are both 1 - b, but they
-                // round differently and the ratio can exceed 1.
-                clamp_result((a + b - cast::<T>(2.0) * a * b) / denom)
-            }
-        }
+        TConormFamily::Hamacher => hamacher_tconorm(a, b),
         TConormFamily::Yager { p } => {
             debug_assert!(p > 0.0, "Yager p must be > 0");
             scaled_lp_norm_2(a, b, cast(p)).min(T::one())
@@ -472,13 +463,61 @@ impl GeneratorFamily {
     }
 
     /// Evaluate the generator residuum `a -> b`.
+    ///
+    /// This is `f^-1(f(b) - f(a))`. When `f(b)` is infinite, either `b` is the
+    /// zero of a strict generator (`f(0) = inf`, and the result is
+    /// `f^-1(inf) = 0`), or both values overflowed and the difference is
+    /// taken in log space. Subtracting the overflowed values gave
+    /// `inf - inf = NaN`, which `max(0, NaN)` turned into 0 and the inverse
+    /// into 1.
     pub fn residuum(self, a: f64, b: f64) -> f64 {
         let a = a.clamp(0.0, 1.0);
         let b = b.clamp(0.0, 1.0);
         if a <= b {
-            1.0
-        } else {
-            self.inverse((self.value(b) - self.value(a)).max(0.0))
+            return 1.0;
+        }
+        let difference = self.value(b) - self.value(a);
+        if !difference.is_nan() && difference != f64::INFINITY {
+            return self.inverse(difference.max(0.0));
+        }
+        if b <= 0.0 {
+            return self.inverse(f64::INFINITY);
+        }
+        // ln(f(b) - f(a)) = ln f(b) + ln(1 - f(a) / f(b)), with f(a) < f(b).
+        let (ln_fa, ln_fb) = (self.ln_value(a), self.ln_value(b));
+        self.inverse_from_ln(ln_fb + ln_one_minus_exp((ln_fa - ln_fb).min(-f64::MIN_POSITIVE)))
+    }
+
+    /// `ln f(x)` for `0 < x < 1`, finite where `f(x)` overflows.
+    fn ln_value(self, x: f64) -> f64 {
+        match self {
+            // f = ((1-x)/x)^p
+            Self::Dombi { p } => p * ((-x).ln_1p() - x.ln()),
+            // f = (-ln x)^p
+            Self::AczelAlsina { p } => p * (-x.ln()).ln(),
+            // f = (x^p - 1) / (-p) for p < 0, and x^p - 1 = e^t - 1 with
+            // t = p ln x > 0; ln(e^t - 1) = t + ln(1 - e^-t).
+            Self::SchweizerSklar { p } if p < -FRANK_PRODUCT_LIMIT_EPS => {
+                let t = p * x.ln();
+                t + ln_one_minus_exp(-t) - (-p).ln()
+            }
+            _ => self.value(x).ln(),
+        }
+    }
+
+    /// `f^-1(e^l)`, finite where `e^l` overflows.
+    fn inverse_from_ln(self, l: f64) -> f64 {
+        match self {
+            Self::Dombi { p } => 1.0 / (1.0 + (l / p).exp()),
+            Self::AczelAlsina { p } => (-(l / p).exp()).exp(),
+            // (1 - p y)^(1/p) with -p y = e^u, u = ln(-p) + l:
+            // ln(1 + e^u) = max(u, 0) + ln_1p(e^-|u|).
+            Self::SchweizerSklar { p } if p < -FRANK_PRODUCT_LIMIT_EPS => {
+                let u = (-p).ln() + l;
+                let softplus = u.max(0.0) + (-u.abs()).exp().ln_1p();
+                (softplus / p).exp().clamp(0.0, 1.0)
+            }
+            _ => self.inverse(l.exp()),
         }
     }
 }
@@ -1019,6 +1058,7 @@ pub fn tnorm_generic<T: Float>(family: TConormFamily, a: T, b: T) -> T {
         TConormFamily::Probabilistic => a * b,
         TConormFamily::Bounded => (a + b - T::one()).max(T::zero()),
         TConormFamily::Drastic => drastic_tnorm(a, b),
+        TConormFamily::Hamacher => hamacher_tnorm(a, b),
         TConormFamily::NilpotentMinimum => nilpotent_minimum_tnorm(a, b),
         TConormFamily::SchweizerSklar { p } => schweizer_sklar_tnorm(a, b, cast(p)),
         TConormFamily::SugenoWeber { p } => sugeno_weber_tnorm(a, b, cast(p)),
