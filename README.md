@@ -141,6 +141,13 @@ prefer `TNorm` or `LogicFamily`. `PRODUCT` is the `Probabilistic` variant, so
 `tconorm(PRODUCT, a, b)` is `a + b - a * b` and the deprecated
 `tnorm(PRODUCT, a, b)` is still `a * b`.
 
+Residual negation is `¬a = a → 0` (`TNorm::negation`, `LogicFamily::neg`).
+It is involutive only for Lukasiewicz; `Godel` and `Product` give a two-valued
+negation, so `¬¬a = a` does not hold. That is why each built-in family overrides
+`tconorm` with the standard-negation dual: the literal duality
+`a ⊕ b = ¬(¬a ⊗ ¬b)` collapses to the constant `1` under a non-involutive
+negation.
+
 Inputs outside `[0, 1]` are clamped to `[0, 1]` by every family. `tnorm` and
 `tconorm` treat NaN as 0; the residuum, gradient and fold functions can return
 NaN for NaN input.
